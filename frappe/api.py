@@ -15,14 +15,30 @@ from frappe.utils.response import build_response
 
 @frappe.whitelist()
 def get_holiday_list(parent_name):
+    import frappe
+    import json
+
     if not frappe.has_permission("Holiday", "read"):
         frappe.throw("You do not have permission to view Holidays", frappe.PermissionError)
-    
-    holidays = frappe.get_all(
-        "Holiday",
-        filters={"parent": parent_name},
-        fields=["holiday_date", "description"]
-    )
+
+    # Parsing input JSON agar menjadi list
+    parent_name = frappe.parse_json(parent_name) if isinstance(parent_name, str) else parent_name
+
+    # Jika tidak ada tahun dikirim, kembalikan array kosong
+    if not parent_name:
+        return []
+
+    # Buat query dengan LIKE untuk setiap tahun
+    like_conditions = " OR ".join(["LOWER(parent) LIKE %s" for _ in parent_name])
+    values = [f"%{str(year).lower()}%" for year in parent_name]
+
+    query = f"""
+        SELECT holiday_date, description 
+        FROM `tabHoliday`
+        WHERE {like_conditions}
+    """
+
+    holidays = frappe.db.sql(query, values, as_dict=True)
     return holidays
 
 def handle():

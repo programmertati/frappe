@@ -101,14 +101,21 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 		this.$result.empty();
 		this.$result.addClass("gantt-modern");
 
+		// Ambil tahun dari 'start' dan buat daftar unik
+		const uniqueYears = [...new Set(this.tasks.map(task => new Date(task.start).getFullYear()))];
+
 		frappe.call({
 			method: "frappe.api.get_holiday_list",
 			args: {
-				parent_name: "Holiday List 2025"
+				parent_name: JSON.stringify(uniqueYears) // Kirim sebagai JSON string
 			},
 			callback: function(response) {
-				let holidays = response.message.map(holiday => holiday.holiday_date); // Perbaikan
-				me.add_holiday_markers(holidays);
+				if (response.message) {
+					let holidays = response.message.map(holiday => holiday.holiday_date);
+					me.add_holiday_markers(holidays);
+				} else {
+					console.warn("No holidays found");
+				}
 			}
 		});
 	
