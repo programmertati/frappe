@@ -58,6 +58,8 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 
 			// **Perbaiki dependensi agar hanya mengambil child langsung**
 			var dependencies = me.getAllDependencies(item.name, me.data).join(",") || "";
+
+			console.log(dependencies);
 	
 			var r = {
 				start: item[field_map.start],
@@ -181,6 +183,7 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 		if (!this.gantt || !this.gantt.dates) return;
 	
 		holidays.forEach((holiday) => {
+			console.log(holiday);
 			let dateIndex = this.gantt.dates.findIndex(date => moment(date).format("YYYY-MM-DD") === holiday);
 		
 			if (dateIndex !== -1) {
