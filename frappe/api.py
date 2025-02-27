@@ -13,6 +13,17 @@ from frappe.utils.data import sbool
 from frappe.utils.password import get_decrypted_password
 from frappe.utils.response import build_response
 
+@frappe.whitelist()
+def get_holiday_list(parent_name):
+    if not frappe.has_permission("Holiday", "read"):
+        frappe.throw("You do not have permission to view Holidays", frappe.PermissionError)
+    
+    holidays = frappe.get_all(
+        "Holiday",
+        filters={"parent": parent_name},
+        fields=["holiday_date", "description"]
+    )
+    return holidays
 
 def handle():
 	"""

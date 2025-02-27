@@ -56,6 +56,9 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 				label = item[field_map.title];
 			}
 
+			// **Perbaiki dependensi agar hanya mengambil child langsung**
+			var dependencies = me.getAllDependencies(item.name, me.data).join(",") || "";
+	
 			var r = {
 				start: item[field_map.start],
 				end: item[field_map.end],
@@ -63,7 +66,8 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 				id: item[field_map.id || "name"],
 				doctype: me.doctype,
 				progress: progress,
-				dependencies: item.depends_on_tasks || "",
+				dependencies: dependencies,
+				// dependencies: item.depends_on_tasks || "",
 			};
 
 			if (item.color && frappe.ui.color.validate_hex(item.color)) {
@@ -78,6 +82,7 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 		});
 	}
 
+
 	render() {
 		this.load_lib.then(() => {
 			this.render_gantt();
@@ -85,16 +90,28 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 	}
 
 	render_header() {}
+	
 
 	render_gantt() {
 		const me = this;
 		const gantt_view_mode = this.view_user_settings.gantt_view_mode || "Day";
 		const field_map = this.calendar_settings.field_map;
 		const date_format = "YYYY-MM-DD";
-
+		
 		this.$result.empty();
 		this.$result.addClass("gantt-modern");
 
+		frappe.call({
+			method: "frappe.api.get_holiday_list",
+			args: {
+				parent_name: "Holiday List 2025"
+			},
+			callback: function(response) {
+				let holidays = response.message.map(holiday => holiday.holiday_date); // Perbaikan
+				me.add_holiday_markers(holidays);
+			}
+		});
+	
 		this.gantt = new Gantt(this.$result[0], this.tasks, {
 			bar_height: 35,
 			bar_corner_radius: 4,
@@ -140,22 +157,61 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 				var item = me.get_item(task.id);
 
 				var html = `<div class="title">${task.name}</div>
-					<div class="subtitle">${moment(task._start).format("MMM D")} - ${moment(task._end).format(
-					"MMM D"
-				)}</div>`;
+					<div class="subtitle">${moment(task._start).format("MMM D")} - ${moment(task._end).format("MMM D")}</div>
+					`;
 
 				// custom html in doctype settings
 				var custom = me.settings.gantt_custom_popup_html;
 				if (custom && $.isFunction(custom)) {
 					var ganttobj = task;
+					
 					html = custom(ganttobj, item);
 				}
+				console.log(html);
+
 				return '<div class="details-container">' + html + "</div>";
 			},
 		});
+
 		this.setup_view_mode_buttons();
 		this.set_colors();
 	}
+
+	add_holiday_markers(holidays) {
+		if (!this.gantt || !this.gantt.dates) return;
+	
+		holidays.forEach((holiday) => {
+			let dateIndex = this.gantt.dates.findIndex(date => moment(date).format("YYYY-MM-DD") === holiday);
+		
+			if (dateIndex !== -1) {
+				let holidayMarker = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+				holidayMarker.setAttribute("class", "gantt-holiday");
+				holidayMarker.setAttribute("x", dateIndex * this.gantt.options.column_width);
+				holidayMarker.setAttribute("y", 0);
+				holidayMarker.setAttribute("width", this.gantt.options.column_width);
+				holidayMarker.setAttribute("height", "100%");
+				holidayMarker.setAttribute("fill", "rgba(255, 0, 0, 0.2)");
+	
+				this.gantt.layers.grid.appendChild(holidayMarker);
+			}
+		});
+	}
+
+	// Fungsi rekursif untuk mendapatkan semua child
+	getAllDependencies(taskName, data) {
+		let result = [];
+	
+		// Cari child langsung dari taskName
+		let children = data.filter(child => 
+			child.depends_on_tasks && child.depends_on_tasks.split(",").map(t => t.trim()).includes(taskName)
+		);
+	
+		children.forEach(child => {
+			result.push(child.name); // Tambah child ke result
+		});
+	
+		return result;
+	}	
 
 	setup_view_mode_buttons() {
 		// view modes (for translation) __("Day"), __("Week"), __("Month"),
@@ -214,9 +270,22 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 			`;
 			})
 			.join("");
+			
+		let styles = `
+			.gantt-holiday {
+				fill: rgba(255, 0, 0, 0.2);
+				opacity : 0.5;
+				z-index: -1;
+				pointer-events: none;
+			}
+		`;
 
-		style = `<style>${style}</style>`;
-		this.$result.prepend(style);
+		// Tambahkan CSS ke dalam <style> di <head>
+		let styleTag = document.createElement("style");
+		styleTag.innerHTML = style + styles;
+		document.head.appendChild(styleTag);
+		// style = `<style>${style}</style>`;
+		// this.$result.prepend(style);
 	}
 
 	get_item(name) {
