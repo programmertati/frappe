@@ -15,11 +15,8 @@ from frappe.utils.response import build_response
 
 @frappe.whitelist()
 def get_holiday_list(parent_name):
-    import frappe
-    import json
-
-    if not frappe.has_permission("Holiday", "read"):
-        frappe.throw("You do not have permission to view Holidays", frappe.PermissionError)
+    # if not frappe.has_permission("Holiday List", "read"):
+    #     frappe.throw("You do not have permission to view Holidays", frappe.PermissionError)
 
     # Parsing input JSON agar menjadi list
     parent_name = frappe.parse_json(parent_name) if isinstance(parent_name, str) else parent_name
