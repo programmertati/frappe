@@ -15,6 +15,9 @@ from frappe.utils.response import build_response
 
 @frappe.whitelist()
 def get_holiday_list(parent_name):
+    import frappe
+    import json
+
     # if not frappe.has_permission("Holiday List", "read"):
     #     frappe.throw("You do not have permission to view Holidays", frappe.PermissionError)
 
