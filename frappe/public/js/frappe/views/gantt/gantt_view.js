@@ -68,6 +68,9 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 				progress: progress,
 				dependencies: dependencies,
 				// dependencies: item.depends_on_tasks || "",
+
+				act_start_date: item[field_map.act_start],
+				act_end_date: item[field_map.act_end],
 			};
 
 			if (item.color && frappe.ui.color.validate_hex(item.color)) {
@@ -79,6 +82,53 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 			}
 
 			return r;
+		});
+	}
+
+	add_overdue_bars() {
+		if (!this.gantt || !this.gantt.tasks || !this.gantt.bars) return;
+	
+		const ganttStart = this.gantt.gantt_start;
+		// const ganttStart = moment(this.gantt.gantt_start).add(1, 'days');
+		const columnWidth = this.gantt.options.column_width;
+	
+		const svg = this.$result.find("svg").get(0);
+	
+		this.gantt.tasks.forEach(task => {
+			if (task.act_end_date && task.end) {
+				const expectedEnd = moment(task.end);
+				const actualEnd = moment(task.act_end_date);
+				
+				if (actualEnd.isAfter(expectedEnd)) {
+					const bar = this.gantt.bars.find(b => b.task.id === task.id);
+					if (!bar) return;
+				
+					const overdueStart = moment(expectedEnd).add(1, 'days');
+					const overdueStartX = overdueStart.diff(ganttStart, 'days') * columnWidth;
+				
+					const overdueEndX = actualEnd.clone().add(1, 'days').diff(ganttStart, 'days') * columnWidth;
+				
+					const overdueWidth = overdueEndX - overdueStartX;
+				
+					if (overdueWidth > 0) {
+						const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+				
+						rect.setAttribute("x", overdueStartX);
+						rect.setAttribute("y", bar.y);
+						rect.setAttribute("width", overdueWidth);
+						rect.setAttribute("height", bar.height);
+						rect.setAttribute("fill", "#FF0000");
+						rect.setAttribute("rx", 4);
+						rect.setAttribute("ry", 4);
+						rect.setAttribute("opacity", "0.8");
+				
+						svg.appendChild(rect);
+					}
+				}
+				
+	
+
+			}
 		});
 	}
 
@@ -179,6 +229,8 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 			},
 		});
 
+		this.add_overdue_bars();
+
 		this.setup_view_mode_buttons();
 		this.set_colors();
 	}
@@ -257,27 +309,34 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 	}
 
 	set_colors() {
-		const classes = this.tasks
-			.map((t) => t.custom_class)
-			.filter((c) => c && c.startsWith("color-"));
-
-		let style = classes
-			.map((c) => {
-				const class_name = c.replace("#", "");
-				const bar_color = "#" + c.substr(6);
+		const today = moment();
+		let style = this.tasks
+			.filter((t) => t.custom_class && t.custom_class.startsWith("color-"))
+			.map((t) => {
+				const class_name = t.custom_class.replace("#", "");
+				const raw_color = "#" + t.custom_class.substr(6); // Ambil warna dari class, misal 'color-29CD42'
+				const isOverdue = t.act_end_date && t.end
+				? moment(t.act_end_date).isAfter(moment(t.end))
+				: false;
+				// cek apakah task sudah lewat dari tanggal hari ini
+				// const isOverdue = moment(t.end).isBefore(today);
+				// const bar_color = isOverdue ? '#FF0000'  : raw_color ;
+				const bar_color = raw_color;
+	
 				const progress_color = frappe.ui.color.get_contrast_color(bar_color);
+	
 				return `
-				.gantt .bar-wrapper.${class_name} .bar {
-					fill: ${bar_color};
-				}
-				.gantt .bar-wrapper.${class_name} .bar-progress {
-					fill: ${progress_color};
-				}
-			`;
+					.gantt .bar-wrapper.${class_name} .bar {
+						fill: ${bar_color};
+					}
+					.gantt .bar-wrapper.${class_name} .bar-progress {
+						fill: ${progress_color};
+					}
+				`;
 			})
 			.join("");
-			
-		let styles = `
+	
+			let styles = `
 			.gantt-holiday {
 				fill: rgba(255, 0, 0, 0.2);
 				opacity : 0.5;
@@ -285,14 +344,14 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 				pointer-events: none;
 			}
 		`;
-
-		// Tambahkan CSS ke dalam <style> di <head>
-		let styleTag = document.createElement("style");
-		styleTag.innerHTML = style + styles;
-		document.head.appendChild(styleTag);
+			// Tambahkan CSS ke dalam <style> di <head>
+			let styleTag = document.createElement("style");
+			styleTag.innerHTML = style + styles;
+			document.head.appendChild(styleTag);
 		// style = `<style>${style}</style>`;
 		// this.$result.prepend(style);
 	}
+	
 
 	get_item(name) {
 		return this.data.find((item) => item.name === name);
@@ -304,4 +363,5 @@ frappe.views.GanttView = class GanttView extends frappe.views.ListView {
 			"assets/frappe/node_modules/frappe-gantt/dist/frappe-gantt.min.js",
 		];
 	}
+	
 };

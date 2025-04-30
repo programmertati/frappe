@@ -90,6 +90,8 @@ frappe.views.CalendarView = class CalendarView extends frappe.views.ListView {
 							id: "name",
 							start: doc.start_date_field,
 							end: doc.end_date_field,
+							act_start: doc.act_start_date,
+							act_end: doc.act_end_date,
 							title: doc.subject_field,
 							allDay: doc.all_day ? 1 : 0,
 						},
@@ -115,11 +117,14 @@ frappe.views.CalendarView = class CalendarView extends frappe.views.ListView {
 
 frappe.views.Calendar = class Calendar {
 	constructor(options) {
+		console.log(options);
 		$.extend(this, options);
 		this.field_map = this.field_map || {
 			id: "name",
 			start: "start",
 			end: "end",
+			act_start: "act_start",
+			act_end: "act_end",
 			allDay: "all_day",
 			convertToUserTz: "convert_to_user_tz",
 		};
